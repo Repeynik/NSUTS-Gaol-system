@@ -1,5 +1,5 @@
 import bogdan
-import input as myinput
+import myinput
 import output
 
 import psycopg2
@@ -28,7 +28,7 @@ while True:
 
     ls = output.sendtest(sol_id, last)
 
-    input.update(cursor, ls)
+    myinput.update(cursor, ls)
 
     
 
