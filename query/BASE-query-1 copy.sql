@@ -4,18 +4,21 @@
 --GO
 CREATE TABLE QUEUE
 (
-Sol_ID int PRIMARY KEY,
-Verdict_First varchar (255),
-Verdict_Second varchar (255) -- not NULL only if verdict_first is TimeLimit
+sol_id int PRIMARY KEY,
+user_id int,
+competition_id int,
+task_id int,
+verdict_first varchar (255),
+verdict_second varchar (255) -- not NULL only if verdict_first is TimeLimit
 );
 --GO
-CREATE TABLE solutions
+CREATE TABLE SOLUTIONS
 (
-Sol_ID int PRIMARY KEY, -- primary key == unique entry 
-User_ID int NOT NULL,
-Task_ID int NOT NULL,
-Sol_Path varchar (255) NOT NULL, --  its will be path to some dirrectory with solution files (.c or .zip)
-Verdict_Final varchar (255) -- after tests =  either Verdict_Second if Verdict_first == TimeLimit or Verdict_First
+sol_id int PRIMARY KEY,
+user_id int,
+competition_id int,
+task_id int,
+verdict varchar (255)
 );
 --GO
 CREATE TABLE USERS

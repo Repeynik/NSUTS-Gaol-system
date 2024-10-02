@@ -1,0 +1,12 @@
+SELECT * FROM information_schema.tables
+WHERE table_schema='public';
+
+SELECT * FROM QUEUE;
+
+SELECT * FROM SOLUTIONS;
+
+DELETE FROM QUEUE;
+
+DROP TABLE QUEUE;
+
+DROP TABLE SOLUTIONS;

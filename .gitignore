@@ -55,5 +55,7 @@ dkms.conf
 **/include/
 **/lib/
 **/lib64/
+**/solutions/
+**/__pycache__/
 lib64
 pyvenv.cfg

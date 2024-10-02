@@ -12,6 +12,9 @@ except:
 
 cursor = conn.cursor()
 
+#delete past
+cursor.execute("DELETE FROM QUEUE;")
+
 # cursor.execute('SELECT * FROM SOLUTIONS')
 # records = cursor.fetchall()
 
@@ -20,25 +23,40 @@ cursor = conn.cursor()
 #     print(r)
     #(f"{r.Sol_ID}\t {r.User_ID}\t {r.Task_ID}\t {r.Sol_Path}\t {r.Verdict_Final}")
 sol_id = 0
+step = 10
+# delete past solutions
+bogdan.clear()
 while True:
+    #print(sol_id, sol_id+step)
+    bogdan.spam(sol_id, sol_id+step)
+
+    for i in range (sol_id, sol_id + step):
+        #print(i)
+        myinput.throw(cursor, i)
     
-    last = bogdan.spam(sol_id, 10)
+    # debug
+    #myinput.print_all(cursor)
+    output.send_test(cursor, sol_id, sol_id + step)
 
-    myinput.throw(cursor, sol_id, last)
-
-    ls = output.sendtest(sol_id, last)
-
-    myinput.update(cursor, ls)
+    for i in range(sol_id, sol_id + step):
+        ss = myinput.take_verdict_first(cursor, i)
+        #print(ss, ss == 'time limit', i)
+        if ss == 'time limit':
+            output.send_retest(cursor, i)
 
     
 
+    # myinput.update(cursor, ls)
+
+    
+    sol_id += step
     print("write 1 to stop")
     isStop = input()
-    if isStop:
+    if isStop == '1':
         break
     
     
 
-
+conn.commit()
 cursor.close()
 conn.close()
