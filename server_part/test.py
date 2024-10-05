@@ -23,11 +23,11 @@ def test_delete_task_from_queue(sol_id):
 
 threads = []
 
-threads.append(threading.Thread(target=test_insert_task_for_testing, args=(1, 'TimeLimit', 'NULL')))
+threads.append(threading.Thread(target=test_insert_task_for_testing, args=(17, 'TimeLimit', 'NULL')))
 threads.append(threading.Thread(target=test_get_task_for_testing))
 threads.append(threading.Thread(target=test_check_queue_and_retest))
 threads.append(threading.Thread(target=test_insert_solution_verdict, args=(6, 'Accepted')))
-threads.append(threading.Thread(target=test_update_queue, args=('verdict_second', 'Accepted', 1)))
+threads.append(threading.Thread(target=test_update_queue, args=('verdict_first', 'TimeLimit', 15))) 
 threads.append(threading.Thread(target=test_delete_task_from_queue, args=(1,)))
 
 for thread in threads:

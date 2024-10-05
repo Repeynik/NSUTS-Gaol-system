@@ -29,11 +29,10 @@ def handle_client(client_socket, address):
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
             # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
             # и в целом добавить обработчик ошибок сюда
-            client_socket.sendall(blob)
-            client_socket.shutdown(socket.SHUT_WR)  # Закрываем отправку
+            client_socket.sendall(bytes(sol_id))
 
             verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
-            serverSQL.update_solution_verdict(sol_id, verdict) # Нам не важно, какой будет вердикт - он уже будет окончательный
+            serverSQL.insert_solution_verdict(sol_id, verdict) # Нам не важно, какой будет вердикт - он уже будет окончательный
             serverSQL.delete_task_from_queue(sol_id)
             if verdict == "Accepted":
                 print(f"Задача Sol_ID: {sol_id} успешно перетестирована. Вердикт: {verdict}")
@@ -57,16 +56,16 @@ def handle_client(client_socket, address):
             
             verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
             if verdict == "Accepted":
-                serverSQL.update_solution_verdict(sol_id, verdict)
+                serverSQL.insert_solution_verdict(sol_id, verdict)
                 serverSQL.delete_task_from_queue(sol_id)
-                print(f"Задача Sol_ID: {sol_id} успешно перетестирована. Вердикт: {verdict}")
+                print(f"Задача Sol_ID: {sol_id} успешно протестирована. Вердикт: {verdict}")
             elif verdict == "TimeLimit":
                 # Обновляем таблицу QUEUE для повторного тестирования
                 serverSQL.update_queue("verdict_first", verdict, sol_id)
                 print(f"Задача Sol_ID: {sol_id} отправлена на перетестирование. Вердикт: {verdict}")
             else:
                 # Не отправляем задачу на повторное тестирование, просто игнорируем
-                serverSQL.update_solution_verdict(sol_id, verdict)
+                serverSQL.insert_solution_verdict(sol_id, verdict)
                 serverSQL.delete_task_from_queue(sol_id)
                 print(f"Задача Task_ID: {sol_id} не принята. Вердикт: {verdict}")
         else:
