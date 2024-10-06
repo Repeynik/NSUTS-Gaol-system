@@ -8,8 +8,8 @@ sol_id int PRIMARY KEY,
 user_id int,
 competition_id int,
 task_id int,
-verdict_first varchar (255),
-verdict_second varchar (255) -- not NULL only if verdict_first is TimeLimit
+sol_blob bytea,
+is_timeout BOOLEAN
 );
 --GO
 CREATE TABLE SOLUTIONS
@@ -18,28 +18,30 @@ sol_id int PRIMARY KEY,
 user_id int,
 competition_id int,
 task_id int,
+sol_blob bytea,
 verdict varchar (255)
 );
 --GO
 CREATE TABLE USERS
 (
-User_ID int PRIMARY KEY,
-User_Name varchar (255) NOT NULL
+user_id int PRIMARY KEY,
+user_name varchar (255) NOT NULL
 );
 --GO
 CREATE TABLE TASKS
 (
-    Task_ID int PRIMARY KEY,
-    Competition_Name varchar(255),
-    Task_Name varchar(255),
-    Tests_Path varchar(255) -- its will be path to some dirrectory with tests (and maybe limits for tests or limits will be in tests included)
+competition_id int PRIMARY KEY,
+competition_name varchar(255),
+task_id int,
+task_name varchar(255),
+tests_blob bytea
 );
 --GO
 CREATE TABLE MACHINES --?? this can be fully implemented on taker 'script' logic (so mostly useless and time consuming table (only on prototype phase have some benefits))
 (
-Machine_ID int PRIMARY KEY, 
-Sol_ID int, -- some int if machine have solution else NULL if machine is free
-Is_Dedicated BIT -- bit == boolean (1, 0, NULL)
+machine_id int PRIMARY KEY, 
+sol_id int, -- some int if machine have solution else NULL if machine is free
+is_dedicated BOOLEAN -- boolean (TRUE, FALSE, NULL)
 );
 --GO
 INSERT INTO SOLUTIONS (Sol_ID, User_ID, Task_ID, Sol_Path, Verdict_Final)
@@ -59,6 +61,14 @@ WHERE Sol_ID = 1;
 --GO
 SELECT * FROM SOLUTIONS;
 --GO
+SELECT * FROM QUEUE;
+
+INSERT INTO QUEUE (sol_ID, User_ID, competition_id, Task_ID, sol_blob, Verdict_first, verdict_second)
+VALUES
+    (2, 0, 1, 1, '\x01', NULL, NULL)
+;
+
+	SELECT * FROM QUEUE WHERE verdict_first IS NULL LIMIT 1;
 
 -- DELETE FROM SOLUTIONS WHERE Sol_ID = 2;
 -- GO
