@@ -23,13 +23,13 @@ def handle_client(client_socket, address):
         
         for task in tasks_to_retest:
             #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, verdict_first, verdict_second, blob = task
+            sol_id, user_id, competition_id, task_id, blob, is_timeout = task
             
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
             # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
             # и в целом добавить обработчик ошибок сюда
-            client_socket.sendall(bytes(sol_id))
+            client_socket.sendall(bytes(blob))
 
             verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
             serverSQL.insert_solution_verdict(sol_id, verdict) # Нам не важно, какой будет вердикт - он уже будет окончательный
@@ -45,7 +45,7 @@ def handle_client(client_socket, address):
         
         if task:
             #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, verdict_first, verdict_second, blob = task
+            sol_id, user_id, competition_id, task_id, blob, is_timeout = task = task
             
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
@@ -59,9 +59,9 @@ def handle_client(client_socket, address):
                 serverSQL.insert_solution_verdict(sol_id, verdict)
                 serverSQL.delete_task_from_queue(sol_id)
                 print(f"Задача Sol_ID: {sol_id} успешно протестирована. Вердикт: {verdict}")
-            elif verdict == "TimeLimit":
+            elif verdict == "Timeout":
                 # Обновляем таблицу QUEUE для повторного тестирования
-                serverSQL.update_queue("verdict_first", verdict, sol_id)
+                serverSQL.set_timeout(sol_id)
                 print(f"Задача Sol_ID: {sol_id} отправлена на перетестирование. Вердикт: {verdict}")
             else:
                 # Не отправляем задачу на повторное тестирование, просто игнорируем
