@@ -51,7 +51,7 @@ def handle_client(client_socket, address):
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
             # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
             # и в целом добавить обработчик ошибок сюда
-            client_socket.sendall(blob)
+            client_socket.sendall(bytes(blob))
             client_socket.shutdown(socket.SHUT_WR)  # Закрываем отправку
             
             verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
