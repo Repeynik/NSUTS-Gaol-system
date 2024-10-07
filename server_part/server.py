@@ -2,8 +2,14 @@ import socket
 import threading
 import serverSQL;
 
+variation = 2
+
 # Настройки сервера
-HOST = '0.0.0.0'
+HOST : str
+if variation == 1:
+    HOST = '37.193.252.134'
+elif variation == 2:
+    HOST = '127.0.0.1'
 PORT = 65432
 
 # TODO Возможно стоит вместо задач на одного клиента смотреть на address ТестМашины и 
@@ -17,20 +23,20 @@ def handle_client(client_socket, address):
     # Тогда один клиент будет занят только ретестом.
     # Проблема - я хз насолько это правильно, тк мы все время тестирования будем подрублены к клиенту + есть гипотетическая ситуация 
     # когда мы можем занять несколько ТестМашин такими списками.
-    tasks_to_retest = serverSQL.check_queue_and_retest()
+    tasks_to_retest = serverSQL.get_all_timeout_tasks_for_retesting()
 
     if tasks_to_retest:
         
         for task in tasks_to_retest:
             #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, user_id, competition_id, task_id, blob, is_timeout = task
-            
+            sol_id, user_id, competition_id, task_id, blob, is_testing, is_timeout = task
+            print(task)
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
             # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
             # и в целом добавить обработчик ошибок сюда
             client_socket.sendall(bytes(blob))
-
+            
             verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
             serverSQL.insert_solution_verdict(sol_id, verdict) # Нам не важно, какой будет вердикт - он уже будет окончательный
             serverSQL.delete_task_from_queue(sol_id)
@@ -41,11 +47,11 @@ def handle_client(client_socket, address):
     
     else:
         # Если нет задач на ретест, получаем обычную задачу для тестирования
-        task = serverSQL.get_task_for_testing()
-        
+        task = serverSQL.get_one_task_for_testing()
+        print(task)
         if task:
             #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, user_id, competition_id, task_id, blob, is_timeout = task = task
+            sol_id, user_id, competition_id, task_id, blob, is_testing, is_timeout = task = task
             
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
@@ -78,6 +84,9 @@ def handle_client(client_socket, address):
 
 def start_server():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        #М TODO Если сокет занят, то setsockopt переиспользует его
+        # Нужно при случае если убить сокет не закрыв его
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind((HOST, PORT))
         server_socket.listen()
         print(f"Сервер запущен и слушает на порту {PORT}...")

@@ -3,39 +3,35 @@ from psycopg2 import pool
 import threading
 
 # вариация для быстрого переключения между серверами
-variant = 2
+variation = 2
 
-# Настройки базы данных Алёны
-DB_HOST_1 = '37.193.252.134'
-DB_NAME_1 = 'NSUTS'
-DB_USER_1 = 'postgres'
-DB_PASSWORD_1 = 'strongPassword123'
-# Моя
-DB_HOST_2 = '127.0.0.1'
-DB_NAME_2 = 'NSUTS'
-DB_USER_2 = 'postgres'
-DB_PASSWORD_2 = '123'
+DB_HOST : str
+DB_NAME : str
+DB_USER : str
+DB_PASSWORD : str
+
+if variation == 1:
+    # Настройки базы данных Алёны
+    DB_HOST = '37.193.252.134'
+    DB_NAME = 'NSUTS'
+    DB_USER = 'postgres'
+    DB_PASSWORD = 'strongPassword123'
+elif variation == 2:
+    # Моя
+    DB_HOST = '127.0.0.1'
+    DB_NAME = 'NSUTS'
+    DB_USER = 'postgres'
+    DB_PASSWORD = '123'
 
 #TODO  будет прикольно добавить динамические пулы
-connection_pool : pool.SimpleConnectionPool
-if variant == 1:
-    connection_pool = pool.SimpleConnectionPool(
-        1, 
-        20, 
-        host=DB_HOST_1,
-        database=DB_NAME_1,
-        user=DB_USER_1,
-        password=DB_PASSWORD_1
-    )
-elif variant == 2:
-    connection_pool = pool.SimpleConnectionPool(
-        1, 
-        20, 
-        host=DB_HOST_2,
-        database=DB_NAME_2,
-        user=DB_USER_2,
-        password=DB_PASSWORD_2
-    )
+connection_pool = pool.SimpleConnectionPool(
+    1, 
+    20, 
+    host=DB_HOST,
+    database=DB_NAME,
+    user=DB_USER,
+    password=DB_PASSWORD
+)
 
 # Блокировка для доступа к базе данных. Мы же в потоке лол
 db_lock = threading.Lock()
@@ -45,8 +41,11 @@ def get_one_task_for_testing():
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE is_timeout IS NULL LIMIT 1;")
+            cursor.execute("SELECT * FROM QUEUE WHERE is_timeout IS NULL AND is_testing IS False LIMIT 1; ")
             task = cursor.fetchone()
+            sol_id = task[0]
+            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
             return task
         except Exception as e:
             print(f"Ошибка при подключении к базе данных: {e}")
@@ -59,8 +58,12 @@ def get_all_timeout_tasks_for_retesting():
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE is_timeout = True ;")
+            cursor.execute("SELECT * FROM QUEUE WHERE is_testing IS False AND is_timeout = True ;")
             tasks_to_retest = cursor.fetchall()
+            for row in tasks_to_retest:
+                sol_id = row[0]
+                cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
             return tasks_to_retest
         except Exception as e:
             print(f"Ошибка при подключении к базе данных: {e}")
@@ -88,7 +91,7 @@ def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_timeout) VALUES (%s, %s, %s, %s, %s, NULL);", (sol_id, user_id, competition_id, task_id, sol_blob))
+            cursor.execute("INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, is_timeout) VALUES (%s, %s, %s, %s, %s, False, NULL);", (sol_id, user_id, competition_id, task_id, sol_blob))
             connection.commit()
             print(f"Создана запись для теста Sol_ID {sol_id}")
         except Exception as e:
@@ -103,7 +106,49 @@ def set_timeout(sol_id):
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_timeout = True WHERE sol_id = %s;", (sol_id, ))
+            cursor.execute("UPDATE QUEUE SET is_testing = False, is_timeout = True WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
+            print(f"Задача sol_id {sol_id} обновлена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+        finally:
+            cursor.close()
+            connection_pool.putconn(connection)
+
+def set_testing(sol_id):
+    with db_lock:
+        connection = connection_pool.getconn()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
+            print(f"Задача sol_id {sol_id} обновлена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+        finally:
+            cursor.close()
+            connection_pool.putconn(connection)
+
+def set_testing(sol_id):
+    with db_lock:
+        connection = connection_pool.getconn()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
+            print(f"Задача sol_id {sol_id} обновлена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+        finally:
+            cursor.close()
+            connection_pool.putconn(connection)
+
+def unset_testing(sol_id):
+    with db_lock:
+        connection = connection_pool.getconn()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("UPDATE QUEUE SET is_testing = False WHERE sol_id = %s;", (sol_id, ))
             connection.commit()
             print(f"Задача sol_id {sol_id} обновлена.")
         except Exception as e:

@@ -9,9 +9,10 @@ user_id int,
 competition_id int,
 task_id int,
 sol_blob bytea,
+is_testing BOOLEAN,
 is_timeout BOOLEAN
 );
---GO
+--GO			
 CREATE TABLE SOLUTIONS
 (
 sol_id int PRIMARY KEY,
@@ -73,8 +74,12 @@ VALUES
 -- DELETE FROM SOLUTIONS WHERE Sol_ID = 2;
 -- GO
 
+SELECT * FROM QUEUE WHERE is_timeout IS NULL LIMIT 1;
 
---DROP TABLE SOLUTIONS;
+SELECT * FROM QUEUE WHERE is_timeout IS NULL AND is_testing IS False LIMIT 1;
+
+
+DROP TABLE QUEUE;
 --GO
 
 --DROP DATABASE NSUTS;
