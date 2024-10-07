@@ -1,0 +1,14 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "37.193.252.134",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "NSUTS test server",
+            "database": "NSUTS",
+            "username": "postgres",
+            "password": "strongPassword123"
+        }
+    ]
+}

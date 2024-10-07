@@ -1,13 +1,19 @@
 import socket
 import threading
-import serverSQL;
+import serverSQL
+import sys
+import os
+# Питон свихнулся и не видит пакеты, при нормальной работе эти строчки удалить
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
-variation = 2
+from task_generating.task_generating import tasks_generating
+
+variation = 1
 
 # Настройки сервера
 HOST : str
 if variation == 1:
-    HOST = '37.193.252.134'
+    HOST = '0.0.0.0'
 elif variation == 2:
     HOST = '127.0.0.1'
 PORT = 65432
@@ -83,6 +89,9 @@ def handle_client(client_socket, address):
     client_socket.close()
 
 def start_server():
+    # TODO Заглушка для создания задач, заменить при первой потребности
+    tasks_generating(10)
+    
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         #М TODO Если сокет занят, то setsockopt переиспользует его
         # Нужно при случае если убить сокет не закрыв его

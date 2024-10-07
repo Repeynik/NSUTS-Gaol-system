@@ -3,7 +3,7 @@ from psycopg2 import pool
 import threading
 
 # вариация для быстрого переключения между серверами
-variation = 2
+variation = 1
 
 DB_HOST : str
 DB_NAME : str
@@ -107,48 +107,6 @@ def set_timeout(sol_id):
         try:
             cursor = connection.cursor()
             cursor.execute("UPDATE QUEUE SET is_testing = False, is_timeout = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
-            print(f"Задача sol_id {sol_id} обновлена.")
-        except Exception as e:
-            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-
-def set_testing(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
-        try:
-            cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
-            print(f"Задача sol_id {sol_id} обновлена.")
-        except Exception as e:
-            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-
-def set_testing(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
-        try:
-            cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
-            print(f"Задача sol_id {sol_id} обновлена.")
-        except Exception as e:
-            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-
-def unset_testing(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
-        try:
-            cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_testing = False WHERE sol_id = %s;", (sol_id, ))
             connection.commit()
             print(f"Задача sol_id {sol_id} обновлена.")
         except Exception as e:
