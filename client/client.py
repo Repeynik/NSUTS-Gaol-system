@@ -13,6 +13,7 @@ PORT = 65432
 
 def connect():
     while True:
+        time.sleep(0.3)
         client_socket = socket.socket()
         client_socket.connect((HOST, PORT))
 
