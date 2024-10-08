@@ -1,5 +1,5 @@
 import threading
-from server_part.serverSQL import delete_all_queue, delete_all_solutions
+from serverSQL import delete_all_queue, delete_all_solutions
 
 def server_prepare():
     threads = []

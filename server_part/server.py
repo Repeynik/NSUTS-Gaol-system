@@ -6,7 +6,7 @@ import os
 # Питон свихнулся и не видит пакеты, при нормальной работе эти строчки удалить
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 
-from task_generating.task_generating import tasks_generating
+from server_part.task_generating import tasks_generating
 
 variation = 1
 
@@ -34,9 +34,7 @@ def handle_client(client_socket, address):
     if tasks_to_retest:
         
         for task in tasks_to_retest:
-            #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, user_id, competition_id, task_id, blob, is_testing, is_timeout = task
-            print(task)
+            sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
             # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
@@ -56,8 +54,7 @@ def handle_client(client_socket, address):
         task = serverSQL.get_one_task_for_testing()
         print(task)
         if task:
-            #TODO Возможно blob находится на другом месте, исправить если что
-            sol_id, user_id, competition_id, task_id, blob, is_testing, is_timeout = task = task
+            sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task = task
             
             # Отправляем blob клиенту
             # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
@@ -73,7 +70,7 @@ def handle_client(client_socket, address):
                 print(f"Задача Sol_ID: {sol_id} успешно протестирована. Вердикт: {verdict}")
             elif verdict == "Timeout":
                 # Обновляем таблицу QUEUE для повторного тестирования
-                serverSQL.set_timeout(sol_id)
+                serverSQL.set_verdict(sol_id)
                 print(f"Задача Sol_ID: {sol_id} отправлена на перетестирование. Вердикт: {verdict}")
             else:
                 # Не отправляем задачу на повторное тестирование, просто игнорируем
@@ -90,7 +87,7 @@ def handle_client(client_socket, address):
 
 def start_server():
     # TODO Заглушка для создания задач, заменить при первой потребности
-    tasks_generating(10)
+    tasks_generating(50)
     
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
         #М TODO Если сокет занят, то setsockopt переиспользует его

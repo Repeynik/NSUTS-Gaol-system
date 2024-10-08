@@ -2,7 +2,7 @@ import socket
 # TODO Заглушка тайм. Потом будут реальные тесты
 import time
 
-variation = 2
+variation = 1
 
 HOST : str
 if variation == 1:

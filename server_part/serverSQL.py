@@ -41,7 +41,7 @@ def get_one_task_for_testing():
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE is_timeout IS NULL AND is_testing IS False LIMIT 1; ")
+            cursor.execute("SELECT * FROM QUEUE WHERE verdict IS NULL AND is_testing IS False LIMIT 1; ")
             task = cursor.fetchone()
             sol_id = task[0]
             cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
@@ -58,7 +58,7 @@ def get_all_timeout_tasks_for_retesting():
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE is_testing IS False AND is_timeout = True ;")
+            cursor.execute("SELECT * FROM QUEUE WHERE is_testing IS False AND verdict = 'Timeout';")
             tasks_to_retest = cursor.fetchall()
             for row in tasks_to_retest:
                 sol_id = row[0]
@@ -91,26 +91,11 @@ def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
         connection = connection_pool.getconn()
         try:
             cursor = connection.cursor()
-            cursor.execute("INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, is_timeout) VALUES (%s, %s, %s, %s, %s, False, NULL);", (sol_id, user_id, competition_id, task_id, sol_blob))
+            cursor.execute("INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, verdict) VALUES (%s, %s, %s, %s, %s, False, NULL);", (sol_id, user_id, competition_id, task_id, sol_blob))
             connection.commit()
             print(f"Создана запись для теста Sol_ID {sol_id}")
         except Exception as e:
             print(f"Ошибка при вставке в очередь: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-
-
-def set_timeout(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
-        try:
-            cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_testing = False, is_timeout = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
-            print(f"Задача sol_id {sol_id} обновлена.")
-        except Exception as e:
-            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
         finally:
             cursor.close()
             connection_pool.putconn(connection)
@@ -125,6 +110,42 @@ def delete_task_from_queue(sol_id):
             print(f"Задача с sol_id {sol_id} успешно удалена из очереди.")
         except Exception as e:
             print(f"Ошибка при удалении задачи: {e}")
+        finally:
+            cursor.close()
+            connection_pool.putconn(connection)
+
+def set_verdict(sol_id):
+    with db_lock:
+        connection = connection_pool.getconn()
+        try:
+            cursor = connection.cursor()
+            cursor.execute("UPDATE QUEUE SET is_testing = False, verdict = 'Timeout' WHERE sol_id = %s;", (sol_id, ))
+            connection.commit()
+            print(f"Задача sol_id {sol_id} обновлена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+        finally:
+            cursor.close()
+            connection_pool.putconn(connection)
+            
+def get_last_id():
+    with db_lock:
+        connection = connection_pool.getconn()
+        try:
+            sol_id_1, sol_id_2 = 0, 0
+            cursor = connection.cursor()
+            cursor.execute("SELECT max(sol_id) FROM QUEUE;")
+            task1 = cursor.fetchone()
+            if task1[0]:
+                sol_id_1 = task1[0]
+            cursor.execute("SELECT max(sol_id) FROM SOLUTIONS;")
+            task2 = cursor.fetchone()
+            if task2[0]:
+                sol_id_2 = task2[0]
+            connection.commit()
+            return max(sol_id_1, sol_id_2)
+        except Exception as e:
+            print(f"Ошибка при подключении к базе данных: {e}")
         finally:
             cursor.close()
             connection_pool.putconn(connection)
