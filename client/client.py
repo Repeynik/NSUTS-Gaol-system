@@ -67,7 +67,8 @@ async def client():
         except Exception as e:
             print(f"Ошибка: {e}")
             await asyncio.sleep(retry_delay)
-            retry_delay *= 2  
+            retry_delay *= 2
+        print("Сервер не доступен, клиент отключён")
 
 if __name__ == "__main__":
     asyncio.run(client())
