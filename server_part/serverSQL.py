@@ -101,8 +101,6 @@ async def insert_solution_verdict(sol_id, verdict):
         except Exception as e:
             print(f"Ошибка при вставке вердикта: {e}")
 
-async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
-    async with pool.acquire() as conn:
 
 async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
     async with pool.acquire() as conn:
@@ -119,8 +117,6 @@ async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_
         except Exception as e:
             print(f"Ошибка при вставке в очередь: {e}")
 
-async def delete_task_from_queue(sol_id):
-    async with pool.acquire() as conn:
 
 async def delete_task_from_queue(sol_id):
     async with pool.acquire() as conn:
@@ -131,8 +127,6 @@ async def delete_task_from_queue(sol_id):
         except Exception as e:
             print(f"Ошибка при удалении задачи: {e}")
 
-async def set_verdict(sol_id):
-    async with pool.acquire() as conn:
 async def set_verdict(sol_id):
     async with pool.acquire() as conn:
         try:
@@ -149,12 +143,6 @@ async def reset_task_testing_flag(sol_id):
             print(f"Задача sol_id {sol_id} сброшена.")
         except Exception as e:
             print(f"Ошибка при обновлении таблицы QUEUE: {e}")
-
-async def get_last_id():
-    async with pool.acquire() as conn:
-        try:
-            sol_id_1 = await conn.fetchval("SELECT max(sol_id) FROM QUEUE;") or 0
-            sol_id_2 = await conn.fetchval("SELECT max(sol_id) FROM SOLUTIONS;") or 0
 
 async def reset_task_testing_flag(sol_id):
     async with pool.acquire() as conn:
@@ -176,8 +164,6 @@ async def get_last_id():
 
 async def delete_all_queue():
     async with pool.acquire() as conn:
-async def delete_all_queue():
-    async with pool.acquire() as conn:
         try:
             await conn.execute("DELETE FROM QUEUE;")
             await conn.execute("DELETE FROM QUEUE;")
@@ -185,8 +171,6 @@ async def delete_all_queue():
         except Exception as e:
             print(f"Ошибка при удалении очереди: {e}")
 
-async def delete_all_solutions():
-    async with pool.acquire() as conn:
 async def delete_all_solutions():
     async with pool.acquire() as conn:
         try:
