@@ -2,25 +2,25 @@ import asyncpg
 import asyncio
 
 # вариация для быстрого переключения между серверами
-variation = 1
+VARIATION = 2
 
-DB_HOST: str
-DB_NAME: str
-DB_USER: str
-DB_PASSWORD: str
+db_host: str
+db_name: str
+db_user: str
+db_password: str
 
-if variation == 1:
+if VARIATION == 1:
     # Настройки базы данных Алёны
-    DB_HOST = '37.193.252.134'
-    DB_NAME = 'NSUTS'
-    DB_USER = 'postgres'
-    DB_PASSWORD = 'strongPassword123'
-elif variation == 2:
-    # Моя
-    DB_HOST = '127.0.0.1'
-    DB_NAME = 'NSUTS'
-    DB_USER = 'postgres'
-    DB_PASSWORD = '123'
+    db_host = '37.193.252.134'
+    db_name = 'NSUTS'
+    db_user = 'postgres'
+    db_password = 'strongPassword123'
+elif VARIATION == 2:
+    # Настройки базы данных Максима (локальная)
+    db_host = '127.0.0.1'
+    db_name = 'NSUTS'
+    db_user = 'postgres'
+    db_password = '123'
 
 
 # Глобальный пул соединений
@@ -31,10 +31,10 @@ async def create_pool():
     pool = await asyncpg.create_pool(
         min_size=1,
         max_size=20,
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
+        host=db_host,
+        database=db_name,
+        user=db_user,
+        password=db_password
     )
 
 # async def validate_token(client_id, token):

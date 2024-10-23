@@ -10,27 +10,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server_part.task_generating import tasks_generating
 
-# вариация для быстрого переключения между серверами
-variation = 1
-
-DB_HOST: str
-DB_NAME: str
-DB_USER: str
-DB_PASSWORD: str
-
-if variation == 1:
-    # Настройки базы данных Алёны
-    DB_HOST = '37.193.252.134'
-    DB_NAME = 'NSUTS'
-    DB_USER = 'postgres'
-    DB_PASSWORD = 'strongPassword123'
-elif variation == 2:
-    # Моя
-    DB_HOST = '127.0.0.1'
-    DB_NAME = 'NSUTS'
-    DB_USER = 'postgres'
-    DB_PASSWORD = '123'
-
 async def handle_client(websocket, path):
     print(f"Подключено к {websocket.remote_address}")
 
