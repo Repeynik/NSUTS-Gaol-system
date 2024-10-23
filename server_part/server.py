@@ -7,10 +7,8 @@ import sys
 import os
 import json
 
-import json
 
 # Питон свихнулся и не видит пакеты, при нормальной работе эти строчки удалить
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server_part.task_generating import tasks_generating
@@ -50,8 +48,6 @@ async def handle_client(websocket, path):
                 await serverSQL.set_verdict(sol_id)
                 print(f"Задача Sol_ID: {sol_id} отправлена на перетестирование. Вердикт: {verdict}")
             else:
-                await serverSQL.insert_solution_verdict(sol_id, verdict)
-                await serverSQL.delete_task_from_queue(sol_id)
                 await serverSQL.insert_solution_verdict(sol_id, verdict)
                 await serverSQL.delete_task_from_queue(sol_id)
                 print(f"Задача Task_ID: {sol_id} не принята. Вердикт: {verdict}")
@@ -124,17 +120,8 @@ async def start_server():
         print(f"Сервер запущен и слушает на порту 65432...")
         await asyncio.Future()  # Бесконечный цикл для поддержания сервера
 
-async def start_server():
-    await serverSQL.create_pool()
-    # Заглушка для создания задач, заменить при первой потребности
-    await tasks_generating(300)
-
-    async with websockets.serve(handle_client, '0.0.0.0', 65432):
-        print(f"Сервер запущен и слушает на порту 65432...")
-        await asyncio.Future()  # Бесконечный цикл для поддержания сервера
 
 
 
 if __name__ == "__main__":
-    asyncio.run(start_server())
     asyncio.run(start_server())

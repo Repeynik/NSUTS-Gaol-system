@@ -4,14 +4,14 @@ import json
 import random
 
 
-VARIATION = 2
+VARIATION = 1
 # URL сервера
 # Алены
 if VARIATION == 1:
-    server_url = 'ws://37.193.252.134:65432'
+    SERVER_URL = 'ws://37.193.252.134:65432'
 # Максима
 if VARIATION == 2:
-    server_url = 'ws://127.0.0.1:65432'
+    SERVER_URL = 'ws://127.0.0.1:65432'
 
 async def test_task(task):
     # Симуляция тестирования задачи

@@ -1,7 +1,5 @@
 import asyncpg
 import asyncio
-import asyncpg
-import asyncio
 
 # вариация для быстрого переключения между серверами
 VARIATION = 2
