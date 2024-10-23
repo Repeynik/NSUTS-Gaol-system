@@ -1,107 +1,144 @@
-import socket
-import threading
+import asyncio
+import websockets
 import serverSQL
 import sys
 import os
+import json
+
 # Питон свихнулся и не видит пакеты, при нормальной работе эти строчки удалить
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server_part.task_generating import tasks_generating
 
+# вариация для быстрого переключения между серверами
 variation = 1
 
-# Настройки сервера
-HOST : str
+DB_HOST: str
+DB_NAME: str
+DB_USER: str
+DB_PASSWORD: str
+
 if variation == 1:
-    HOST = '0.0.0.0'
+    # Настройки базы данных Алёны
+    DB_HOST = '37.193.252.134'
+    DB_NAME = 'NSUTS'
+    DB_USER = 'postgres'
+    DB_PASSWORD = 'strongPassword123'
 elif variation == 2:
-    HOST = '127.0.0.1'
-PORT = 65432
+    # Моя
+    DB_HOST = '127.0.0.1'
+    DB_NAME = 'NSUTS'
+    DB_USER = 'postgres'
+    DB_PASSWORD = '123'
 
-# TODO Возможно стоит вместо задач на одного клиента смотреть на address ТестМашины и 
-# при совпадении с адресом выделенной тестМашины отдавать ей задачи на ретест (сейчас отдаются на любую). 
-# Минусы - вообще никакой гибкости, но сделать просто, нужно просто определить любую тест машину.
-def handle_client(client_socket, address):
-    print(f"Подключено к {address}")
-    
-    # Сначала проверяем задачи на ретест. Логика такая - тк задачи на ретест будут крутиться на одной машине, 
-    # возьмем сразу весь список задач на ретест.
-    # Тогда один клиент будет занят только ретестом.
-    # Проблема - я хз насолько это правильно, тк мы все время тестирования будем подрублены к клиенту + есть гипотетическая ситуация 
-    # когда мы можем занять несколько ТестМашин такими списками.
-    tasks_to_retest = serverSQL.get_all_timeout_tasks_for_retesting()
+async def handle_client(websocket, path):
+    print(f"Подключено к {websocket.remote_address}")
 
-    if tasks_to_retest:
-        
-        for task in tasks_to_retest:
-            sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
-            # Отправляем blob клиенту
-            # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
-            # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
-            # и в целом добавить обработчик ошибок сюда
-            client_socket.sendall(bytes(blob))
-            
-            verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
-            serverSQL.insert_solution_verdict(sol_id, verdict) # Нам не важно, какой будет вердикт - он уже будет окончательный
-            serverSQL.delete_task_from_queue(sol_id)
-            if verdict == "Accepted":
-                print(f"Задача Sol_ID: {sol_id} успешно перетестирована. Вердикт: {verdict}")
-            else:
-                print(f"Задача Sol_ID: {sol_id} не принята. Вердикт: {verdict}")
-    
-    else:
-        # Если нет задач на ретест, получаем обычную задачу для тестирования
-        task = serverSQL.get_one_task_for_testing()
-        print(task)
-        if task:
-            sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task = task
-            
-            # Отправляем blob клиенту
-            # TODO sendall не является безопасной функцией те мы не знаем, сколько пакетов отправили в случае ошибки. Но она позволяет
-            # отсылать сколько угодно данных, что сильно полезно при отправке большого количества текста. Стоит подумать над заменой 
-            # и в целом добавить обработчик ошибок сюда
-            client_socket.sendall(bytes(blob))
-            client_socket.shutdown(socket.SHUT_WR)  # Закрываем отправку
-            
-            verdict = client_socket.recv(1024).decode('utf-8')  #Ждем и получаем вердикт
-            if verdict == "Accepted":
-                serverSQL.insert_solution_verdict(sol_id, verdict)
-                serverSQL.delete_task_from_queue(sol_id)
-                print(f"Задача Sol_ID: {sol_id} успешно протестирована. Вердикт: {verdict}")
-            elif verdict == "Timeout":
-                # Обновляем таблицу QUEUE для повторного тестирования
-                serverSQL.set_verdict(sol_id)
+    async def poll_status(sol_id):
+        while True:
+            try:
+                message = await asyncio.wait_for(websocket.recv(), timeout=10)
+                data = json.loads(message)
+                if "status" in data:
+                    status = data["status"]
+                    print(f"Получен статус: {status}")
+                elif "verdict" in data:
+                    verdict = data["verdict"]
+                    print(f"Получен вердикт: {verdict}")
+                    return verdict
+            except asyncio.TimeoutError:
+                print("Таймаут ожидания статуса")
+                print(f"Соединение с {websocket.remote_address} закрыто")
+                await serverSQL.reset_task_testing_flag(sol_id)
+                return
+            except websockets.ConnectionClosed:
+                print(f"Соединение с {websocket.remote_address} закрыто")
+                await serverSQL.reset_task_testing_flag(sol_id)
+                return
+
+    async def handle_verdict(verdict, sol_id, retest=False):
+        if verdict == "Accepted":
+            await serverSQL.insert_solution_verdict(sol_id, verdict)
+            await serverSQL.delete_task_from_queue(sol_id)
+            print(f"Задача Sol_ID: {sol_id} успешно протестирована. Вердикт: {verdict}")
+        elif verdict == "Timeout":
+            if retest == False:
+                await serverSQL.set_verdict(sol_id)
                 print(f"Задача Sol_ID: {sol_id} отправлена на перетестирование. Вердикт: {verdict}")
             else:
-                # Не отправляем задачу на повторное тестирование, просто игнорируем
-                serverSQL.insert_solution_verdict(sol_id, verdict)
-                serverSQL.delete_task_from_queue(sol_id)
+                await serverSQL.insert_solution_verdict(sol_id, verdict)
+                await serverSQL.delete_task_from_queue(sol_id)
                 print(f"Задача Task_ID: {sol_id} не принята. Вердикт: {verdict}")
         else:
-            print('Нет доступных задач для тестирования.')
+            await serverSQL.insert_solution_verdict(sol_id, verdict)
+            await serverSQL.delete_task_from_queue(sol_id)
+            print(f"Задача Task_ID: {sol_id} не принята. Вердикт: {verdict}")
 
-    # Закрываем соединение с клиентом
-    # TODO Я так и не поняла, нужно ли закрывать соединение с клиентом во время тестирования, вынесла пока здесь. Возможно стоит это изменить.
-    # Есть закрытие отправки на клиента выше
-    client_socket.close()
-
-def start_server():
-    # TODO Заглушка для создания задач, заменить при первой потребности
-    tasks_generating(50)
-    
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
-        #М TODO Если сокет занят, то setsockopt переиспользует его
-        # Нужно при случае если убить сокет не закрыв его
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind((HOST, PORT))
-        server_socket.listen()
-        print(f"Сервер запущен и слушает на порту {PORT}...")
-
+    try:
         while True:
-            client_socket, address = server_socket.accept()
-            # Делаем потоки для каждого соединения
-            client_thread = threading.Thread(target=handle_client, args=(client_socket, address))
-            client_thread.start()
+            # Проверяем задачи на ретест
+            tasks_to_retest = await serverSQL.get_all_timeout_tasks_for_retesting()
+
+            if tasks_to_retest:
+                for task in tasks_to_retest:
+                    sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
+                    blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
+                    data_to_send = {
+                        "sol_id": sol_id,
+                        "user_id": user_id,
+                        "competition_id": competition_id,
+                        "task_id": task_id,
+                        "blob": blob_str
+                    }
+                    await websocket.send(json.dumps(data_to_send))
+
+                    # Запускаем параллельные задачи для опроса статуса и обработки вердикта
+                    verdict = await poll_status(sol_id)
+                    if verdict:
+                        await handle_verdict(verdict, sol_id, True)
+            else:
+                # Если нет задач на ретест, получаем обычную задачу для тестирования
+                task = await serverSQL.get_one_task_for_testing()
+                if task:
+                    sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
+                    blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
+                    data_to_send = {
+                        "sol_id": sol_id,
+                        "user_id": user_id,
+                        "competition_id": competition_id,
+                        "task_id": task_id,
+                        "blob": blob_str
+                    }
+                    await websocket.send(json.dumps(data_to_send))
+
+                    # Запускаем параллельные задачи для опроса статуса и обработки вердикта
+                    verdict = await poll_status(sol_id)
+                    if verdict:
+                        await handle_verdict(verdict, sol_id)
+                else:
+                    print('Нет доступных задач для тестирования.')
+                    await asyncio.sleep(1)  # Ждем немного перед повторной проверкой
+
+    except websockets.ConnectionClosed:
+        print(f"Соединение с {websocket.remote_address} закрыто")
+        # Сбрасываем флаг is_testing для всех задач, которые были в процессе тестирования
+        if task:
+            sol_id = task[0]
+            await serverSQL.reset_task_testing_flag(sol_id)
+        for task in tasks_to_retest:
+            sol_id = task[0]
+            await serverSQL.reset_task_testing_flag(sol_id)
+
+async def start_server():
+    await serverSQL.create_pool()
+    # Заглушка для создания задач, заменить при первой потребности
+    await tasks_generating(300)
+
+    async with websockets.serve(handle_client, '0.0.0.0', 65432):
+        print(f"Сервер запущен и слушает на порту 65432...")
+        await asyncio.Future()  # Бесконечный цикл для поддержания сервера
+
+
 
 if __name__ == "__main__":
-    start_server()
+    asyncio.run(start_server())

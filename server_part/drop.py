@@ -1,15 +1,11 @@
-import threading
+import asyncio
 from serverSQL import delete_all_queue, delete_all_solutions
 
-def server_prepare():
-    threads = []
+async def server_prepare():
+    tasks = [
+        asyncio.create_task(delete_all_solutions()),
+        asyncio.create_task(delete_all_queue())
+    ]
 
-    threads.append(threading.Thread(target=delete_all_solutions))
-    threads.append(threading.Thread(target=delete_all_queue))
+    await asyncio.gather(*tasks)
 
-    for thread in threads:
-        thread.start()
-
-    for thread in threads:
-        thread.join()
-        
