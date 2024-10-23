@@ -23,7 +23,7 @@ async def send_verdict(websocket, sol_id, verdict):
 
 async def handle_task(websocket, task):
     sol_id = task["sol_id"]
-    print(f"Получена задача Sol_ID: {sol_id}")
+    print(f"Принята на обработку задача Sol_ID: {sol_id}")
 
     # Отправляем статус "Testing"
     await send_status(websocket, sol_id, "Testing")
@@ -37,12 +37,12 @@ async def handle_task(websocket, task):
 
 async def client():
     retry_delay = 1 
-    max_retries = 5
+    max_retries = 3
 
     for attempt in range(max_retries):
         try:
             async with websockets.connect(SERVER_URL) as websocket:
-                print(f"Подключено к серверу {SERVER_URL}")
+                print(f"Подсоединено к серверу {SERVER_URL}")
 
                 while True:
                     try:
@@ -51,15 +51,17 @@ async def client():
                         await handle_task(websocket, task)
                     except websockets.ConnectionClosed:
                         print("Соединение с сервером закрыто")
+                        print("Ожидайте...")
                         break
                     except Exception as e:
-                        print(f"Ошибка: {e}")
+                        print(f"Ошибка следующая: {e}")
                         break
 
             retry_delay = 1
             break
         except websockets.ConnectionClosed:
             print(f"Не удалось подключиться к серверу. Повторная попытка через {retry_delay} секунд...")
+            print("Ожидайте...")
             await asyncio.sleep(retry_delay)
             retry_delay *= 2
         except Exception as e:
