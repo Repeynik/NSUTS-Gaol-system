@@ -59,6 +59,9 @@ dkms.conf
 **/__pycache__/
 lib64
 pyvenv.cfg
+.lib
+.vscode
+.idea
 
 #my
 blob
