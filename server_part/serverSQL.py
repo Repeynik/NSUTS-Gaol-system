@@ -65,10 +65,6 @@ async def get_one_task_for_testing():
 
 async def get_all_timeout_tasks_for_retesting():
     async with pool.acquire() as conn:
-            print(f"Ошибка при получении задачи: {e}")
-
-async def get_all_timeout_tasks_for_retesting():
-    async with pool.acquire() as conn:
         try:
             tasks_to_retest = await conn.fetch("SELECT * FROM QUEUE WHERE is_testing IS FALSE AND verdict = 'Timeout';")
             tasks_to_retest = await conn.fetch("SELECT * FROM QUEUE WHERE is_testing IS FALSE AND verdict = 'Timeout';")
@@ -78,10 +74,6 @@ async def get_all_timeout_tasks_for_retesting():
                 await conn.execute("UPDATE QUEUE SET is_testing = TRUE WHERE sol_id = $1;", sol_id)
             return tasks_to_retest
         except Exception as e:
-            print(f"Ошибка при получении задач для повторного тестирования: {e}")
-
-async def insert_solution_verdict(sol_id, verdict):
-    async with pool.acquire() as conn:
             print(f"Ошибка при получении задач для повторного тестирования: {e}")
 
 async def insert_solution_verdict(sol_id, verdict):
