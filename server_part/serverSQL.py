@@ -1,14 +1,13 @@
-
-from psycopg2 import pool
-import threading
+import asyncpg
+import asyncio
 
 # вариация для быстрого переключения между серверами
 variation = 1
 
-DB_HOST : str
-DB_NAME : str
-DB_USER : str
-DB_PASSWORD : str
+DB_HOST: str
+DB_NAME: str
+DB_USER: str
+DB_PASSWORD: str
 
 if variation == 1:
     # Настройки базы данных Алёны
@@ -23,157 +22,126 @@ elif variation == 2:
     DB_USER = 'postgres'
     DB_PASSWORD = '123'
 
-#TODO  будет прикольно добавить динамические пулы
-connection_pool = pool.SimpleConnectionPool(
-    1, 
-    20, 
-    host=DB_HOST,
-    database=DB_NAME,
-    user=DB_USER,
-    password=DB_PASSWORD
-)
 
-# Блокировка для доступа к базе данных. Мы же в потоке лол
-db_lock = threading.Lock()
+# Глобальный пул соединений
+pool = None
 
-def get_one_task_for_testing():
-    with db_lock:
-        connection = connection_pool.getconn()
+async def create_pool():
+    global pool
+    pool = await asyncpg.create_pool(
+        min_size=1,
+        max_size=20,
+        host=DB_HOST,
+        database=DB_NAME,
+        user=DB_USER,
+        password=DB_PASSWORD
+    )
+
+# async def validate_token(client_id, token):
+#     async with pool.acquire() as conn:
+#         try:
+#             query = """
+#             SELECT COUNT(*)
+#             FROM client_tokens
+#             WHERE client_id = $1 AND token = $2
+#             """
+#             result = await conn.fetchval(query, client_id, token)
+#             return result > 0
+#         except Exception as e:
+#             print(f"Ошибка при проверке токена: {e}")
+#             return False
+
+async def get_one_task_for_testing():
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE verdict IS NULL AND is_testing IS False LIMIT 1; ")
-            task = cursor.fetchone()
-            sol_id = task[0]
-            cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
-            return task
+            task = await conn.fetchrow("SELECT * FROM QUEUE WHERE verdict IS NULL AND is_testing IS FALSE LIMIT 1;")
+            if task:
+                sol_id = task[0]
+                await conn.execute("UPDATE QUEUE SET is_testing = TRUE WHERE sol_id = $1;", sol_id)
+                return task
+            return None
         except Exception as e:
-            print(f"Ошибка при подключении к базе данных: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-       
-def get_all_timeout_tasks_for_retesting():
-    with db_lock:
-        connection = connection_pool.getconn()
+            print(f"Ошибка при получении задачи: {e}")
+
+async def get_all_timeout_tasks_for_retesting():
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("SELECT * FROM QUEUE WHERE is_testing IS False AND verdict = 'Timeout';")
-            tasks_to_retest = cursor.fetchall()
+            tasks_to_retest = await conn.fetch("SELECT * FROM QUEUE WHERE is_testing IS FALSE AND verdict = 'Timeout';")
             for row in tasks_to_retest:
                 sol_id = row[0]
-                cursor.execute("UPDATE QUEUE SET is_testing = True WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
+                await conn.execute("UPDATE QUEUE SET is_testing = TRUE WHERE sol_id = $1;", sol_id)
             return tasks_to_retest
         except Exception as e:
-            print(f"Ошибка при подключении к базе данных: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
+            print(f"Ошибка при получении задач для повторного тестирования: {e}")
 
-# TODO добавить данные о пользователе и решенной задаче(сейчас заглушки)
-def insert_solution_verdict(sol_id, verdict):
-    with db_lock:
-        connection = connection_pool.getconn()
+async def insert_solution_verdict(sol_id, verdict):
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("INSERT INTO Solutions (sol_id, user_id, competition_id, task_id, sol_blob, verdict) VALUES (%s, %s, %s, %s, %s, %s);", (sol_id, 1, 1, 1, b"dead\nbeef", verdict))
-            connection.commit()
+            await conn.execute(
+                "INSERT INTO Solutions (sol_id, user_id, competition_id, task_id, sol_blob, verdict) VALUES ($1, $2, $3, $4, $5, $6);",
+                sol_id, 1, 1, 1, b"dead\nbeef", verdict
+            )
             print(f"Создана запись для решения Sol_ID {sol_id} с вердиктом: {verdict}")
         except Exception as e:
             print(f"Ошибка при вставке вердикта: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-            
-def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
-    with db_lock:
-        connection = connection_pool.getconn()
+
+async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, verdict) VALUES (%s, %s, %s, %s, %s, False, NULL);", (sol_id, user_id, competition_id, task_id, sol_blob))
-            connection.commit()
+            await conn.execute(
+                "INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, verdict) VALUES ($1, $2, $3, $4, $5, FALSE, NULL);",
+                sol_id, user_id, competition_id, task_id, sol_blob
+            )
             print(f"Создана запись для теста Sol_ID {sol_id}")
         except Exception as e:
             print(f"Ошибка при вставке в очередь: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-            
-def delete_task_from_queue(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
+
+async def delete_task_from_queue(sol_id):
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("DELETE FROM QUEUE WHERE sol_id = %s;", (sol_id,))
-            connection.commit()
+            await conn.execute("DELETE FROM QUEUE WHERE sol_id = $1;", sol_id)
             print(f"Задача с sol_id {sol_id} успешно удалена из очереди.")
         except Exception as e:
             print(f"Ошибка при удалении задачи: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
 
-def set_verdict(sol_id):
-    with db_lock:
-        connection = connection_pool.getconn()
+async def set_verdict(sol_id):
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("UPDATE QUEUE SET is_testing = False, verdict = 'Timeout' WHERE sol_id = %s;", (sol_id, ))
-            connection.commit()
+            await conn.execute("UPDATE QUEUE SET is_testing = FALSE, verdict = 'Timeout' WHERE sol_id = $1;", sol_id)
             print(f"Задача sol_id {sol_id} обновлена.")
         except Exception as e:
             print(f"Ошибка при обновлении таблицы QUEUE: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
-            
-def get_last_id():
-    with db_lock:
-        connection = connection_pool.getconn()
+
+async def reset_task_testing_flag(sol_id):
+    async with pool.acquire() as conn:
         try:
-            sol_id_1, sol_id_2 = 0, 0
-            cursor = connection.cursor()
-            cursor.execute("SELECT max(sol_id) FROM QUEUE;")
-            task1 = cursor.fetchone()
-            if task1[0]:
-                sol_id_1 = task1[0]
-            cursor.execute("SELECT max(sol_id) FROM SOLUTIONS;")
-            task2 = cursor.fetchone()
-            if task2[0]:
-                sol_id_2 = task2[0]
-            connection.commit()
+            await conn.execute("UPDATE QUEUE SET is_testing = FALSE WHERE sol_id = $1;", sol_id)
+            print(f"Задача sol_id {sol_id} сброшена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+
+async def get_last_id():
+    async with pool.acquire() as conn:
+        try:
+            sol_id_1 = await conn.fetchval("SELECT max(sol_id) FROM QUEUE;") or 0
+            sol_id_2 = await conn.fetchval("SELECT max(sol_id) FROM SOLUTIONS;") or 0
             return max(sol_id_1, sol_id_2)
         except Exception as e:
-            print(f"Ошибка при подключении к базе данных: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
+            print(f"Ошибка при получении последнего ID: {e}")
 
-def delete_all_queue():
-    with db_lock:
-        connection = connection_pool.getconn()
+async def delete_all_queue():
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("DELETE FROM QUEUE;")
-            connection.commit()
+            await conn.execute("DELETE FROM QUEUE;")
             print(f"Очередь очищена.")
         except Exception as e:
             print(f"Ошибка при удалении очереди: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
 
-def delete_all_solutions():
-    with db_lock:
-        connection = connection_pool.getconn()
+async def delete_all_solutions():
+    async with pool.acquire() as conn:
         try:
-            cursor = connection.cursor()
-            cursor.execute("DELETE FROM SOLUTIONS;")
-            connection.commit()
+            await conn.execute("DELETE FROM SOLUTIONS;")
             print(f"Таблица решений очищена.")
         except Exception as e:
             print(f"Ошибка при удалении таблицы решений: {e}")
-        finally:
-            cursor.close()
-            connection_pool.putconn(connection)
+
