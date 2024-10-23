@@ -1,5 +1,7 @@
 import asyncpg
 import asyncio
+import asyncpg
+import asyncio
 
 # вариация для быстрого переключения между серверами
 VARIATION = 2
@@ -65,10 +67,16 @@ async def get_one_task_for_testing():
 
 async def get_all_timeout_tasks_for_retesting():
     async with pool.acquire() as conn:
+            print(f"Ошибка при получении задачи: {e}")
+
+async def get_all_timeout_tasks_for_retesting():
+    async with pool.acquire() as conn:
         try:
+            tasks_to_retest = await conn.fetch("SELECT * FROM QUEUE WHERE is_testing IS FALSE AND verdict = 'Timeout';")
             tasks_to_retest = await conn.fetch("SELECT * FROM QUEUE WHERE is_testing IS FALSE AND verdict = 'Timeout';")
             for row in tasks_to_retest:
                 sol_id = row[0]
+                await conn.execute("UPDATE QUEUE SET is_testing = TRUE WHERE sol_id = $1;", sol_id)
                 await conn.execute("UPDATE QUEUE SET is_testing = TRUE WHERE sol_id = $1;", sol_id)
             return tasks_to_retest
         except Exception as e:
@@ -76,7 +84,15 @@ async def get_all_timeout_tasks_for_retesting():
 
 async def insert_solution_verdict(sol_id, verdict):
     async with pool.acquire() as conn:
+            print(f"Ошибка при получении задач для повторного тестирования: {e}")
+
+async def insert_solution_verdict(sol_id, verdict):
+    async with pool.acquire() as conn:
         try:
+            await conn.execute(
+                "INSERT INTO Solutions (sol_id, user_id, competition_id, task_id, sol_blob, verdict) VALUES ($1, $2, $3, $4, $5, $6);",
+                sol_id, 1, 1, 1, b"dead\nbeef", verdict
+            )
             await conn.execute(
                 "INSERT INTO Solutions (sol_id, user_id, competition_id, task_id, sol_blob, verdict) VALUES ($1, $2, $3, $4, $5, $6);",
                 sol_id, 1, 1, 1, b"dead\nbeef", verdict
@@ -87,7 +103,14 @@ async def insert_solution_verdict(sol_id, verdict):
 
 async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
     async with pool.acquire() as conn:
+
+async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_blob):
+    async with pool.acquire() as conn:
         try:
+            await conn.execute(
+                "INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, verdict) VALUES ($1, $2, $3, $4, $5, FALSE, NULL);",
+                sol_id, user_id, competition_id, task_id, sol_blob
+            )
             await conn.execute(
                 "INSERT INTO QUEUE (sol_id, user_id, competition_id, task_id, sol_blob, is_testing, verdict) VALUES ($1, $2, $3, $4, $5, FALSE, NULL);",
                 sol_id, user_id, competition_id, task_id, sol_blob
@@ -98,7 +121,11 @@ async def insert_task_for_testing(sol_id, user_id, competition_id, task_id, sol_
 
 async def delete_task_from_queue(sol_id):
     async with pool.acquire() as conn:
+
+async def delete_task_from_queue(sol_id):
+    async with pool.acquire() as conn:
         try:
+            await conn.execute("DELETE FROM QUEUE WHERE sol_id = $1;", sol_id)
             await conn.execute("DELETE FROM QUEUE WHERE sol_id = $1;", sol_id)
             print(f"Задача с sol_id {sol_id} успешно удалена из очереди.")
         except Exception as e:
@@ -106,7 +133,10 @@ async def delete_task_from_queue(sol_id):
 
 async def set_verdict(sol_id):
     async with pool.acquire() as conn:
+async def set_verdict(sol_id):
+    async with pool.acquire() as conn:
         try:
+            await conn.execute("UPDATE QUEUE SET is_testing = FALSE, verdict = 'Timeout' WHERE sol_id = $1;", sol_id)
             await conn.execute("UPDATE QUEUE SET is_testing = FALSE, verdict = 'Timeout' WHERE sol_id = $1;", sol_id)
             print(f"Задача sol_id {sol_id} обновлена.")
         except Exception as e:
@@ -125,13 +155,31 @@ async def get_last_id():
         try:
             sol_id_1 = await conn.fetchval("SELECT max(sol_id) FROM QUEUE;") or 0
             sol_id_2 = await conn.fetchval("SELECT max(sol_id) FROM SOLUTIONS;") or 0
+
+async def reset_task_testing_flag(sol_id):
+    async with pool.acquire() as conn:
+        try:
+            await conn.execute("UPDATE QUEUE SET is_testing = FALSE WHERE sol_id = $1;", sol_id)
+            print(f"Задача sol_id {sol_id} сброшена.")
+        except Exception as e:
+            print(f"Ошибка при обновлении таблицы QUEUE: {e}")
+
+async def get_last_id():
+    async with pool.acquire() as conn:
+        try:
+            sol_id_1 = await conn.fetchval("SELECT max(sol_id) FROM QUEUE;") or 0
+            sol_id_2 = await conn.fetchval("SELECT max(sol_id) FROM SOLUTIONS;") or 0
             return max(sol_id_1, sol_id_2)
         except Exception as e:
+            print(f"Ошибка при получении последнего ID: {e}")
             print(f"Ошибка при получении последнего ID: {e}")
 
 async def delete_all_queue():
     async with pool.acquire() as conn:
+async def delete_all_queue():
+    async with pool.acquire() as conn:
         try:
+            await conn.execute("DELETE FROM QUEUE;")
             await conn.execute("DELETE FROM QUEUE;")
             print(f"Очередь очищена.")
         except Exception as e:
@@ -139,9 +187,14 @@ async def delete_all_queue():
 
 async def delete_all_solutions():
     async with pool.acquire() as conn:
+async def delete_all_solutions():
+    async with pool.acquire() as conn:
         try:
+            await conn.execute("DELETE FROM SOLUTIONS;")
             await conn.execute("DELETE FROM SOLUTIONS;")
             print(f"Таблица решений очищена.")
         except Exception as e:
             print(f"Ошибка при удалении таблицы решений: {e}")
+
+
 
