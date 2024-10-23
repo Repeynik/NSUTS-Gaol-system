@@ -57,6 +57,10 @@ dkms.conf
 **/lib64/
 **/solutions/
 **/__pycache__/
+
+.vscode/
+.idea/
+
 lib64
 pyvenv.cfg
 .lib
