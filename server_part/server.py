@@ -1,7 +1,5 @@
 import asyncio
 import websockets
-import asyncio
-import websockets
 import serverSQL
 import sys
 import os

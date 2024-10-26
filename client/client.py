@@ -4,14 +4,17 @@ import json
 import random
 
 
-VARIATION = 1
+VARIATION = 3
 # URL сервера
 # Алены
 if VARIATION == 1:
-    SERVER_URL = 'ws://37.193.252.134:65432'
-# Максима
+    server_url = 'ws://37.193.252.134:65432'
+# Максима (локальный)
 if VARIATION == 2:
-    SERVER_URL = 'ws://127.0.0.1:65432'
+    server_url = 'ws://127.0.0.1:65432'
+    # Максима (прокси) -> Алены
+if VARIATION == 3:
+    server_url = 'ws://90.189.151.132:1030'
 
 async def test_task(task):
     # Симуляция тестирования задачи
@@ -48,8 +51,8 @@ async def client():
 
     for attempt in range(max_retries):
         try:
-            async with websockets.connect(SERVER_URL) as websocket:
-                print(f"Подсоединено к серверу {SERVER_URL}")
+            async with websockets.connect(server_url) as websocket:
+                print(f"Подсоединено к серверу {server_url}")
 
                 while True:
                     try:

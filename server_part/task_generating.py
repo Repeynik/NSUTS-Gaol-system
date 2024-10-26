@@ -1,8 +1,6 @@
 import random
 import serverSQL
 import asyncio
-import sys
-import os
 
 from drop import server_prepare
 
