@@ -11,8 +11,34 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from server_part.task_generating import tasks_generating
 
+testing_machines = {}
+
 async def handle_client(websocket, path):
     print(f"Подключено к {websocket.remote_address}")
+    testing_machines.update(websocket.remote_address, 0)
+    
+    async def poll_testing():
+        try:
+            message = await asyncio.wait_for(websocket.recv(), timeout=10)
+            data = json.loads(message)
+            if "sol_id" in data and "status" in data:
+                return data["sol_id"]
+            return None
+            
+        except asyncio.TimeoutError:
+            print("Таймаут ожидания статуса")
+            if testing_machines.get(websocket.remote_address) == 3:
+                
+                print(f"Соединение с {websocket.remote_address} закрыто")
+                await serverSQL.reset_task_testing_flag(sol_id)
+                return
+            else:
+                testing_machines.update(websocket.remote_address, testing_machines.get(websocket.remote_address) + 1)
+        except websockets.ConnectionClosed:
+            print(f"Соединение с {websocket.remote_address} закрыто")
+            await serverSQL.reset_task_testing_flag(sol_id)
+            return
+        
 
     async def poll_status(sol_id):
         while True:
@@ -28,11 +54,16 @@ async def handle_client(websocket, path):
                     return verdict
             except asyncio.TimeoutError:
                 print("Таймаут ожидания статуса")
-                print(f"Соединение с {websocket.remote_address} закрыто")
-                await serverSQL.reset_task_testing_flag(sol_id)
-                return
+                if testing_machines.get(websocket.remote_address) == 3:
+                    
+                    print(f"Соединение с {websocket.remote_address} закрыто")
+                    await serverSQL.reset_task_testing_flag(sol_id)
+                    return
+                else:
+                    testing_machines.update(websocket.remote_address, testing_machines.get(websocket.remote_address) + 1)
             except websockets.ConnectionClosed:
                 print(f"Соединение с {websocket.remote_address} закрыто")
+                testing_machines.update(websocket.remote_address, 0)
                 await serverSQL.reset_task_testing_flag(sol_id)
                 return
 
@@ -57,50 +88,62 @@ async def handle_client(websocket, path):
     try:
         while True:
             # Проверяем задачи на ретест
-            tasks_to_retest = await serverSQL.get_all_timeout_tasks_for_retesting()
+            
+            testing_sol_id = await poll_testing()
+            if testing_sol_id:
+                verdict = await poll_status(testing_sol_id)
+                if verdict:
+                    await handle_verdict(verdict, testing_sol_id, True)
+                    testing_machines.update(websocket.remote_address, 0)
+            else:        
+                tasks_to_retest = await serverSQL.get_all_timeout_tasks_for_retesting()
 
-            if tasks_to_retest:
-                for task in tasks_to_retest:
-                    sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
-                    blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
-                    data_to_send = {
-                        "sol_id": sol_id,
-                        "user_id": user_id,
-                        "competition_id": competition_id,
-                        "task_id": task_id,
-                        "blob": blob_str
-                    }
-                    await websocket.send(json.dumps(data_to_send))
+                if tasks_to_retest:
+                    for task in tasks_to_retest:
+                        sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
+                        blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
+                        data_to_send = {
+                            "sol_id": sol_id,
+                            "user_id": user_id,
+                            "competition_id": competition_id,
+                            "task_id": task_id,
+                            "blob": blob_str
+                        }
+                        await websocket.send(json.dumps(data_to_send))
 
-                    # Запускаем параллельные задачи для опроса статуса и обработки вердикта
-                    verdict = await poll_status(sol_id)
-                    if verdict:
-                        await handle_verdict(verdict, sol_id, True)
-            else:
-                # Если нет задач на ретест, получаем обычную задачу для тестирования
-                task = await serverSQL.get_one_task_for_testing()
-                if task:
-                    sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
-                    blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
-                    data_to_send = {
-                        "sol_id": sol_id,
-                        "user_id": user_id,
-                        "competition_id": competition_id,
-                        "task_id": task_id,
-                        "blob": blob_str
-                    }
-                    await websocket.send(json.dumps(data_to_send))
+                        # Запускаем параллельные задачи для опроса статуса и обработки вердикта
+                        verdict = await poll_status(sol_id)
+                        if verdict:
+                            await handle_verdict(verdict, sol_id, True)
+                            testing_machines.update(websocket.remote_address, 0)
 
-                    # Запускаем параллельные задачи для опроса статуса и обработки вердикта
-                    verdict = await poll_status(sol_id)
-                    if verdict:
-                        await handle_verdict(verdict, sol_id)
                 else:
-                    print('Нет доступных задач для тестирования.')
-                    await asyncio.sleep(1)  # Ждем немного перед повторной проверкой
+                    # Если нет задач на ретест, получаем обычную задачу для тестирования
+                    task = await serverSQL.get_one_task_for_testing()
+                    if task:
+                        sol_id, user_id, competition_id, task_id, blob, is_testing, verdict = task
+                        blob_str = blob.decode('utf-8') if isinstance(blob, bytes) else blob
+                        data_to_send = {
+                            "sol_id": sol_id,
+                            "user_id": user_id,
+                            "competition_id": competition_id,
+                            "task_id": task_id,
+                            "blob": blob_str
+                        }
+                        await websocket.send(json.dumps(data_to_send))
+
+                        # Запускаем параллельные задачи для опроса статуса и обработки вердикта
+                        verdict = await poll_status(sol_id)
+                        if verdict:
+                            await handle_verdict(verdict, sol_id)
+                            testing_machines.update(websocket.remote_address, 0)
+                    else:
+                        print('Нет доступных задач для тестирования.')
+                        await asyncio.sleep(1)  # Ждем немного перед повторной проверкой
 
     except websockets.ConnectionClosed:
         print(f"Соединение с {websocket.remote_address} закрыто")
+        testing_machines.update(websocket.remote_address, 0)
         # Сбрасываем флаг is_testing для всех задач, которые были в процессе тестирования
         if task:
             sol_id = task[0]
