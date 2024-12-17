@@ -3,7 +3,7 @@ import websockets
 import json
 import random
 
-VARIATION = 2
+VARIATION = 1
 RECONNECT_TIMEOUT = 15  # Тайм-аут в секундах для ожидания переподключения
 
 # URL сервера

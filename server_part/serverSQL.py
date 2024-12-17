@@ -2,7 +2,7 @@ import asyncpg
 import asyncio
 
 # вариация для быстрого переключения между серверами
-VARIATION = 2
+VARIATION = 1
 
 db_host: str
 db_name: str

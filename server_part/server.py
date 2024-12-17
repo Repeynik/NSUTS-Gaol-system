@@ -17,7 +17,7 @@ testing_machines = {}
 
 async def handle_client(websocket, path):
     print(f"Подключено к {websocket.remote_address}")
-    testing_machines.update(websocket.remote_address, 0)
+    testing_machines.update({websocket.remote_address: 0})
     
     async def poll_testing():
         try:
@@ -35,7 +35,7 @@ async def handle_client(websocket, path):
                 await serverSQL.reset_task_testing_flag(sol_id)
                 return
             else:
-                testing_machines.update(websocket.remote_address, testing_machines.get(websocket.remote_address) + 1)
+                testing_machines.update({websocket.remote_address: testing_machines.get(websocket.remote_address) + 1})
         except websockets.ConnectionClosed:
             print(f"Соединение с {websocket.remote_address} закрыто")
             await serverSQL.reset_task_testing_flag(sol_id)
@@ -62,10 +62,10 @@ async def handle_client(websocket, path):
                     await serverSQL.reset_task_testing_flag(sol_id)
                     return
                 else:
-                    testing_machines.update(websocket.remote_address, testing_machines.get(websocket.remote_address) + 1)
+                    testing_machines.update({websocket.remote_address: testing_machines.get(websocket.remote_address) + 1})
             except websockets.ConnectionClosed:
                 print(f"Соединение с {websocket.remote_address} закрыто")
-                testing_machines.update(websocket.remote_address, 0)
+                testing_machines.update({websocket.remote_address: 0})
                 await serverSQL.reset_task_testing_flag(sol_id)
                 return
 
@@ -96,7 +96,7 @@ async def handle_client(websocket, path):
                 verdict = await poll_status(testing_sol_id)
                 if verdict:
                     await handle_verdict(verdict, testing_sol_id, True)
-                    testing_machines.update(websocket.remote_address, 0)
+                    testing_machines.update({websocket.remote_address: 0})
             else:        
                 tasks_to_retest = await serverSQL.get_all_timeout_tasks_for_retesting()
 
@@ -117,7 +117,7 @@ async def handle_client(websocket, path):
                         verdict = await poll_status(sol_id)
                         if verdict:
                             await handle_verdict(verdict, sol_id, True)
-                            testing_machines.update(websocket.remote_address, 0)
+                            testing_machines.update({websocket.remote_address: 0})
 
                 else:
                     # Если нет задач на ретест, получаем обычную задачу для тестирования
@@ -138,14 +138,14 @@ async def handle_client(websocket, path):
                         verdict = await poll_status(sol_id)
                         if verdict:
                             await handle_verdict(verdict, sol_id)
-                            testing_machines.update(websocket.remote_address, 0)
+                            testing_machines.update({websocket.remote_address: 0})
                     else:
                         print('Нет доступных задач для тестирования.')
                         await asyncio.sleep(1)  # Ждем немного перед повторной проверкой
 
     except websockets.ConnectionClosed:
         print(f"Соединение с {websocket.remote_address} закрыто")
-        testing_machines.update(websocket.remote_address, 0)
+        testing_machines.update({websocket.remote_address: 0})
         # Сбрасываем флаг is_testing для всех задач, которые были в процессе тестирования
         if task:
             sol_id = task[0]
@@ -157,7 +157,7 @@ async def handle_client(websocket, path):
 async def start_server():
     await serverSQL.create_pool()
     # Заглушка для создания задач, заменить при первой потребности
-    await tasks_generating(10)
+    await tasks_generating(100)
 
     async with websockets.serve(handle_client, '0.0.0.0', db_port):
         print(f"Сервер запущен и слушает на порту {db_port}...")
